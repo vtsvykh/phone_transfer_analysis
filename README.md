@@ -4,6 +4,9 @@
 ## Описание проекта
 
 ## Артефакты
+- Бизнес-контекст - docs/1_business_case.md
+- User stories - docs/2_user_stories.md
+- Функциональные требования - docs/3_functional_requirements.md
 
 ## Структура проекта
 - `docs/` - документация
