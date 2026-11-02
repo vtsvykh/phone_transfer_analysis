@@ -1,1 +1,279 @@
+openapi: 3.0.3
+info:
+  title: Phone Transfer API
+  description: |
+    Учебная реконструкция API перевода по номеру телефона
+  version: 1.0.0
 
+servers:
+  - url: https://api.example-bank.ru/api/v1
+    description: Учебный backend-сервис переводов
+
+paths:
+  /transfer-preview:
+    post:
+      summary: Предварительный расчёт перевода
+      description: Проверяет данные перевода и возвращает условия до подтверждения.
+      operationId: createTransferPreview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferPreviewRequest'
+      responses:
+        '200':
+          description: Условия перевода рассчитаны
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferPreviewResponse'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Счёт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Ошибка внешней системы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transfers:
+    post:
+      summary: Создать перевод по номеру телефона
+      description: Создаёт операцию перевода и инициирует её обработку.
+      operationId: createTransfer
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Уникальный ключ запроса для защиты от повторного списания
+          schema:
+            type: string
+            format: uuid
+          example: 7f9c24e2-8d1a-4f7e-b8f1-9a2b3c4d5e6f
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTransferRequest'
+      responses:
+        '201':
+          description: Перевод создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '400':
+          description: Некорректный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Пользователь не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Счёт не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Недостаточно средств, превышен лимит или повторный запрос
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Ошибка СБП или другой внешней системы
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /transfers/{transferId}:
+    get:
+      summary: Получить статус перевода
+      description: Возвращает актуальный статус операции перевода.
+      operationId: getTransferById
+      parameters:
+        - name: transferId
+          in: path
+          required: true
+          description: Идентификатор перевода
+          schema:
+            type: string
+          example: tr-987654
+      responses:
+        '200':
+          description: Статус перевода получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResponse'
+        '404':
+          description: Перевод не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    TransferPreviewRequest:
+      type: object
+      required:
+        - recipientPhone
+        - amount
+        - sourceAccountId
+      properties:
+        recipientPhone:
+          type: string
+          description: Номер телефона получателя
+          example: '+79001234567'
+        amount:
+          type: number
+          format: double
+          description: Сумма перевода в рублях
+          example: 1500.00
+        sourceAccountId:
+          type: string
+          description: Идентификатор счёта или карты списания
+          example: acc-123456
+
+    TransferPreviewResponse:
+      type: object
+      properties:
+        recipientPhone:
+          type: string
+          example: '+79001234567'
+        recipientBankId:
+          type: string
+          example: bank-001
+        transferType:
+          $ref: '#/components/schemas/TransferType'
+        amount:
+          type: number
+          format: double
+          example: 1500.00
+        commission:
+          type: number
+          format: double
+          example: 0.00
+        sourceAccountId:
+          type: string
+          example: acc-123456
+        availableBalance:
+          type: number
+          format: double
+          example: 25000.00
+        availableLimit:
+          type: number
+          format: double
+          example: 100000.00
+
+    CreateTransferRequest:
+      type: object
+      required:
+        - recipientPhone
+        - amount
+        - sourceAccountId
+      properties:
+        recipientPhone:
+          type: string
+          description: Номер телефона получателя
+          example: '+79001234567'
+        amount:
+          type: number
+          format: double
+          description: Сумма перевода в рублях
+          example: 1500.00
+        sourceAccountId:
+          type: string
+          description: Идентификатор счёта или карты списания
+          example: acc-123456
+        comment:
+          type: string
+          description: Комментарий к переводу
+          example: За обед
+
+    TransferResponse:
+      type: object
+      properties:
+        transferId:
+          type: string
+          description: Идентификатор перевода
+          example: tr-987654
+        status:
+          $ref: '#/components/schemas/TransferStatus'
+        transferType:
+          $ref: '#/components/schemas/TransferType'
+        amount:
+          type: number
+          format: double
+          example: 1500.00
+        commission:
+          type: number
+          format: double
+          example: 0.00
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-11-02T11:30:00Z'
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-11-02T11:30:12Z'
+        statusReason:
+          type: string
+          nullable: true
+          description: Причина отклонения или ошибки
+          example: Недостаточно средств на выбранном счёте
+
+    TransferStatus:
+      type: string
+      description: Статус операции перевода
+      enum:
+        - CREATED
+        - PROCESSING
+        - COMPLETED
+        - DECLINED
+        - FAILED
+
+    TransferType:
+      type: string
+      description: Способ проведения перевода
+      enum:
+        - INTERNAL
+        - SBP
+
+    ErrorResponse:
+      type: object
+      properties:
+        errorCode:
+          type: string
+          description: Машиночитаемый код ошибки
+          example: INSUFFICIENT_FUNDS
+        message:
+          type: string
+          description: Понятное сообщение для пользователя
+          example: Недостаточно средств на выбранном счёте
+        details:
+          type: object
+          additionalProperties: true
+          description: Дополнительные данные для диагностики
